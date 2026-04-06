@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <!-- PWA / theme -->
+  <meta name="theme-color" content="#000000">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Calc">
+
+  <title>Calc</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── Display ───────────────────────────────────────── -->
+    <div class="display">
+      <button class="display__history-btn" id="historyToggle" aria-label="Toggle history">
+        <span id="historyArrow">▾</span> History
+      </button>
+      <div class="display__expr"   id="exprDisplay"   aria-live="polite" aria-label="Expression"></div>
+      <div class="display__result" id="resultDisplay" aria-live="polite" aria-label="Result"></div>
+    </div>
+
+    <!-- ── History panel (collapsed by default) ──────────── -->
+    <div class="history-panel" id="historyPanel" aria-label="Calculation history">
+      <ul class="history-list" id="historyList"></ul>
+    </div>
+
+    <!-- ── Keypad (buttons injected by app.js) ───────────── -->
+    <div class="keypad" id="keypad" role="group" aria-label="Calculator keys"></div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

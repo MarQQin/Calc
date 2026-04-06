@@ -1,0 +1,237 @@
+/* ── Reset & base ────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* ── Design tokens ───────────────────────────────────────── */
+:root {
+  /* Colors */
+  --clr-bg:              #000000;
+  --clr-display:         #0c0c0c;
+  --clr-history-bg:      #111111;
+  --clr-divider:         #2c2c2e;
+
+  --clr-btn-digit:       #1e1e1e;
+  --clr-btn-operator:    #2c2c2e;
+  --clr-btn-control:     #3a3a3c;
+  --clr-btn-equals:      #e67e22;
+  --clr-btn-paren:       #2c2c2e;
+
+  --clr-text:            #ffffff;
+  --clr-text-dim:        #8e8e93;
+  --clr-text-operator:   #ff9f0a;
+  --clr-text-result:     #98989d;
+  --clr-text-error:      #ff453a;
+
+  /* Spacing */
+  --gap:            10px;
+  --display-pad:    16px;
+  --radius-btn:     14px;
+
+  /* Sizing — clamp keeps buttons comfortable on any screen */
+  --btn-min-h: clamp(56px, 13vw, 76px);
+}
+
+/* ── Layout shell ────────────────────────────────────────── */
+html, body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+               'Segoe UI', Roboto, sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;           /* dynamic viewport — handles mobile browser chrome */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow: hidden;
+}
+
+/* ── Display area ────────────────────────────────────────── */
+.display {
+  flex: 0 0 auto;
+  background: var(--clr-display);
+  padding: var(--display-pad);
+  padding-top: calc(var(--display-pad) + env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;    /* right-align expression & result */
+  gap: 4px;
+}
+
+.display__history-btn {
+  align-self: flex-start;   /* override flex-end for this element */
+  background: transparent;
+  border: none;
+  color: var(--clr-text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.02em;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.display__history-btn:active {
+  opacity: 0.6;
+}
+
+/* Expression line — large, right-aligned */
+.display__expr {
+  font-size: clamp(28px, 8vw, 44px);
+  font-weight: 300;
+  color: var(--clr-text);
+  word-break: break-all;
+  text-align: right;
+  line-height: 1.2;
+  min-height: 1.2em;
+  width: 100%;
+}
+
+/* Live result preview / error line */
+.display__result {
+  font-size: clamp(18px, 5vw, 26px);
+  font-weight: 300;
+  color: var(--clr-text-result);
+  min-height: 1.2em;
+  text-align: right;
+  width: 100%;
+}
+
+.display__result--error  { color: var(--clr-text-error); }
+.display__result--preview { color: var(--clr-text-result); }
+
+/* ── History panel ───────────────────────────────────────── */
+.history-panel {
+  flex: 0 0 auto;
+  background: var(--clr-history-bg);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-bottom: 1px solid var(--clr-divider);
+}
+
+.history-panel.open {
+  max-height: 210px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.history-panel::-webkit-scrollbar { width: 4px; }
+.history-panel::-webkit-scrollbar-track { background: transparent; }
+.history-panel::-webkit-scrollbar-thumb {
+  background: var(--clr-divider);
+  border-radius: 2px;
+}
+
+.history-list {
+  list-style: none;
+  padding: 4px 0;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 11px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--clr-divider);
+  transition: background 0.1s;
+}
+
+.history-item:last-child { border-bottom: none; }
+.history-item:active     { background: #2c2c2e; }
+
+.history-item--empty {
+  justify-content: center;
+  color: var(--clr-text-dim);
+  font-size: 14px;
+  cursor: default;
+}
+
+.history-item__expr {
+  color: var(--clr-text-dim);
+  font-size: 13px;
+  flex: 1;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item__result {
+  color: var(--clr-text);
+  font-size: 16px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* ── Keypad grid ─────────────────────────────────────────── */
+/*
+ * --cols is set dynamically by JS based on the widest BUTTON_ROW.
+ * Adding more columns later only requires updating the data array.
+ */
+.keypad {
+  flex: 1 1 0;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 4), 1fr);
+  gap: var(--gap);
+  padding: var(--gap);
+  align-content: stretch;   /* rows stretch to fill available height */
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: clamp(20px, 5.5vw, 30px);
+  font-weight: 400;
+  cursor: pointer;
+  min-height: var(--btn-min-h);
+  outline: none;
+  color: var(--clr-text);
+  touch-action: manipulation;   /* eliminates 300 ms tap delay */
+  transition: filter 0.08s, transform 0.07s;
+}
+
+.btn:active {
+  filter: brightness(1.5);
+  transform: scale(0.93);
+}
+
+/* Button variants */
+.btn--digit    { background: var(--clr-btn-digit); }
+.btn--operator { background: var(--clr-btn-operator); color: var(--clr-text-operator); }
+.btn--paren    { background: var(--clr-btn-paren);    color: var(--clr-text-dim);
+                 font-size: clamp(17px, 4.5vw, 24px); }
+.btn--control  { background: var(--clr-btn-control);  color: var(--clr-text-dim); }
+.btn--equals   { background: var(--clr-btn-equals);   font-weight: 600; }
+
+/* Phase 2 button variants (unused now, defined for forward compatibility) */
+.btn--fn       { background: var(--clr-btn-operator); color: var(--clr-text-operator);
+                 font-size: clamp(13px, 3.5vw, 17px); }
+.btn--constant { background: var(--clr-btn-operator); color: #30d158; }
+.btn--mode     { background: var(--clr-btn-control);  color: #64d2ff;
+                 font-size: clamp(12px, 3vw, 15px); font-weight: 600; }
+
+/* ── Desktop preview ─────────────────────────────────────── */
+@media (min-width: 500px) {
+  body {
+    max-width: 400px;
+    margin: 0 auto;
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
+  }
+}
