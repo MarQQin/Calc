@@ -38,7 +38,6 @@ const OPERATORS = {
  * fn: (...args) -> number
  *
  * Phase 2 examples:
- *   sin: { args: 1, fn: (x) => Math.sin(state.degRad === 'deg' ? x * Math.PI / 180 : x) },
  *   cos: { args: 1, fn: (x) => Math.cos(state.degRad === 'deg' ? x * Math.PI / 180 : x) },
  *   tan: { args: 1, fn: (x) => Math.tan(state.degRad === 'deg' ? x * Math.PI / 180 : x) },
  *   log: { args: 1, fn: (x) => Math.log10(x) },
@@ -46,6 +45,9 @@ const OPERATORS = {
  *   sqrt:{ args: 1, fn: (x) => Math.sqrt(x) },
  */
 const FUNCTIONS = {
+  sin: { args: 1, fn: (x) => Math.sin(state.degRad === 'deg' ? x * Math.PI / 180 : x) },
+  cos: { args: 1, fn: (x) => Math.cos(state.degRad === 'deg' ? x * Math.PI / 180 : x) },
+  tan: { args: 1, fn: (x) => Math.tan(state.degRad === 'deg' ? x * Math.PI / 180 : x) },
 };
 
 /**
@@ -295,47 +297,85 @@ function pushHistory(expr, result) {
 // ============================================================
 // === BUTTON LAYOUT
 //
-// BUTTON_ROWS is the single source of truth for the keypad.
-// To add buttons: add entries to existing rows or add new rows.
-// The CSS grid column count is derived from the widest row.
+// TOP_ROWS:    6 rows × 4 cols — smaller scientific buttons
+// BOTTOM_ROWS: 4 rows × 5 cols — larger main buttons
 //
 // Button shape: { label, action, type }
 //   type: 'digit' | 'operator' | 'paren' | 'control' | 'equals'
-//         (Phase 2: 'fn' | 'constant' | 'mode')
+//         'fn' | 'constant' | 'mode'
 //   action: string appended to expr, OR special keyword:
-//           'clear' | 'backspace' | 'evaluate'
+//           'clear' | 'backspace' | 'evaluate' | 'noop'
 // ============================================================
 
-const BUTTON_ROWS = [
+// Top panel — 6 rows × 4 columns of smaller scientific buttons
+const TOP_ROWS = [
   [
-    { label: 'C',  action: 'clear',     type: 'control'  },
-    { label: '(',  action: '(',         type: 'paren'    },
-    { label: ')',  action: ')',         type: 'paren'    },
-    { label: '⌫',  action: 'backspace', type: 'control'  },
+    { label: 'SHIFT', action: 'noop',  type: 'mode'     },
+    { label: 'ALPHA', action: 'noop',  type: 'mode'     },
+    { label: 'DEG',  action: 'toggleDegRad',  type: 'mode'     },
+    { label: 'ON',    action: 'clear', type: 'control'  },
   ],
   [
-    { label: '7',  action: '7',         type: 'digit'    },
-    { label: '8',  action: '8',         type: 'digit'    },
-    { label: '9',  action: '9',         type: 'digit'    },
-    { label: '÷',  action: '/',         type: 'operator' },
+    { label: 'x²',   action: 'noop',  type: 'fn'       },
+    { label: 'x³',   action: 'noop',  type: 'fn'       },
+    { label: 'x⁻¹',  action: 'noop',  type: 'fn'       },
+    { label: '√',    action: 'noop',  type: 'fn'       },
   ],
   [
-    { label: '4',  action: '4',         type: 'digit'    },
-    { label: '5',  action: '5',         type: 'digit'    },
-    { label: '6',  action: '6',         type: 'digit'    },
-    { label: '×',  action: '*',         type: 'operator' },
+    { label: 'sin',  action: 'sin(',  type: 'fn'       },
+    { label: 'cos',  action: 'cos(',  type: 'fn'       },
+    { label: 'tan',  action: 'tan(',  type: 'fn'       },
+    { label: 'log',  action: 'noop',  type: 'fn'       },
   ],
   [
-    { label: '1',  action: '1',         type: 'digit'    },
-    { label: '2',  action: '2',         type: 'digit'    },
-    { label: '3',  action: '3',         type: 'digit'    },
-    { label: '−',  action: '-',         type: 'operator' },
+    { label: 'ln',   action: 'noop',  type: 'fn'       },
+    { label: '(',    action: '(',     type: 'paren'    },
+    { label: ')',    action: ')',     type: 'paren'    },
+    { label: 'π',    action: 'noop',  type: 'constant' },
   ],
   [
-    { label: '0',  action: '0',         type: 'digit'    },
-    { label: '.',  action: '.',         type: 'digit'    },
-    { label: '=',  action: 'evaluate',  type: 'equals'   },
-    { label: '+',  action: '+',         type: 'operator' },
+    { label: 'S⇔D',  action: 'noop',  type: 'mode'     },
+    { label: 'x!',   action: 'noop',  type: 'fn'       },
+    { label: 'nPr',  action: 'noop',  type: 'fn'       },
+    { label: 'nCr',  action: 'noop',  type: 'fn'       },
+  ],
+  [
+    { label: 'RCL',  action: 'noop',  type: 'mode'     },
+    { label: 'STO',  action: 'noop',  type: 'mode'     },
+    { label: 'ENG',  action: 'noop',  type: 'mode'     },
+    { label: '°\'"', action: 'noop',  type: 'fn'       },
+  ],
+];
+
+// Bottom panel — 4 rows × 5 columns of larger main buttons
+const BOTTOM_ROWS = [
+  [
+    { label: '7',   action: '7',        type: 'digit'    },
+    { label: '8',   action: '8',        type: 'digit'    },
+    { label: '9',   action: '9',        type: 'digit'    },
+    { label: 'DEL', action: 'backspace', type: 'control'  },
+    { label: 'AC',  action: 'clear',    type: 'control'  },
+  ],
+  [
+    { label: '4',   action: '4',        type: 'digit'    },
+    { label: '5',   action: '5',        type: 'digit'    },
+    { label: '6',   action: '6',        type: 'digit'    },
+    { label: '×',   action: '*',        type: 'operator' },
+    { label: '÷',   action: '/',        type: 'operator' },
+  ],
+  [
+    { label: '1',   action: '1',        type: 'digit'    },
+    { label: '2',   action: '2',        type: 'digit'    },
+    { label: '3',   action: '3',        type: 'digit'    },
+    { label: '+',   action: '+',        type: 'operator' },
+    { label: '−',   action: '-',        type: 'operator' },
+  ],
+  [
+    { label: '0',   action: '0',        type: 'digit'    },
+    { label: '.',   action: '.',        type: 'digit'    },
+    { label: 'EXP', action: 'noop',     type: 'fn'       },
+    { label: 'ANS', action: 'noop',     type: 'mode'     },
+    { label: '=',   action: 'evaluate', type: 'equals'   },
   ],
 ];
 
@@ -346,25 +386,28 @@ const BUTTON_ROWS = [
 
 const $ = (id) => document.getElementById(id);
 
-/** Render all buttons from BUTTON_ROWS into the keypad grid. */
-function renderButtons() {
-  const keypad = $('keypad');
-  keypad.innerHTML = '';
-
-  const cols = Math.max(...BUTTON_ROWS.map((row) => row.length));
-  keypad.style.setProperty('--cols', cols);
-
-  for (const row of BUTTON_ROWS) {
+/** Populate a grid element from a rows array. */
+function renderGrid(containerEl, rows) {
+  containerEl.innerHTML = '';
+  const cols = Math.max(...rows.map((row) => row.length));
+  containerEl.style.setProperty('--cols', cols);
+  for (const row of rows) {
     for (const btn of row) {
       const el = document.createElement('button');
-      el.className  = `btn btn--${btn.type}`;
+      el.className   = `btn btn--${btn.type}`;
       el.textContent = btn.label;
       el.dataset.action = btn.action;
       el.setAttribute('aria-label', btn.label);
       el.addEventListener('click', onButtonClick, { passive: true });
-      keypad.appendChild(el);
+      containerEl.appendChild(el);
     }
   }
+}
+
+/** Render top (scientific) and bottom (main) keypads. */
+function renderButtons() {
+  renderGrid($('keypadTop'),    TOP_ROWS);
+  renderGrid($('keypadBottom'), BOTTOM_ROWS);
 }
 
 /** Sync the display DOM to current state. */
@@ -439,13 +482,21 @@ function setHistoryOpen(open) {
  * Attempt a silent live evaluation preview.
  * Errors are suppressed — the user is likely mid-expression.
  */
+/** Auto-close unclosed parentheses so `sin(90` becomes `sin(90)`. */
+function autoCloseParens(expr) {
+  const opens = (expr.match(/\(/g) || []).length;
+  const closes = (expr.match(/\)/g) || []).length;
+  return expr + ')'.repeat(Math.max(0, opens - closes));
+}
+
 function computeLiveResult() {
   state.liveResult = '';
   state.error      = '';
   const expr = state.expr.trim();
   if (!expr) return;
   try {
-    const result    = evaluate(expr);
+    const closed    = autoCloseParens(expr);
+    const result    = evaluate(closed);
     const formatted = formatResult(result);
     // Don't echo the same value (happens right after '=' is pressed)
     if (formatted !== state.expr) {
@@ -481,7 +532,8 @@ function handleAction(action) {
     case 'evaluate': {
       if (!state.expr.trim()) break;
       try {
-        const result    = evaluate(state.expr);
+        const closed    = autoCloseParens(state.expr);
+        const result    = evaluate(closed);
         const formatted = formatResult(result);
         pushHistory(state.expr, formatted);
         if (state.historyOpen) updateHistoryPanel();
@@ -494,6 +546,17 @@ function handleAction(action) {
       }
       break;
     }
+
+    case 'toggleDegRad':
+      state.degRad = state.degRad === 'deg' ? 'rad' : 'deg';
+      // Update the MODE button label to reflect current angle unit
+      const modeBtn = document.querySelector('[data-action="toggleDegRad"]');
+      if (modeBtn) modeBtn.textContent = state.degRad.toUpperCase();
+      computeLiveResult();
+      break;
+
+    case 'noop':
+      break; // placeholder — no-op for unimplemented buttons
 
     default:
       // Append operator / digit / parenthesis to expression

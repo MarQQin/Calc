@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -19,22 +19,25 @@
 <body>
   <div id="app">
 
-    <!-- ── Display ───────────────────────────────────────── -->
+    <!-- Display -->
     <div class="display">
       <button class="display__history-btn" id="historyToggle" aria-label="Toggle history">
-        <span id="historyArrow">▾</span> History
+        <span id="historyArrow">&#9662;</span> History
       </button>
       <div class="display__expr"   id="exprDisplay"   aria-live="polite" aria-label="Expression"></div>
       <div class="display__result" id="resultDisplay" aria-live="polite" aria-label="Result"></div>
     </div>
 
-    <!-- ── History panel (collapsed by default) ──────────── -->
+    <!-- History panel -->
     <div class="history-panel" id="historyPanel" aria-label="Calculation history">
       <ul class="history-list" id="historyList"></ul>
     </div>
 
-    <!-- ── Keypad (buttons injected by app.js) ───────────── -->
-    <div class="keypad" id="keypad" role="group" aria-label="Calculator keys"></div>
+    <!-- Keypad -->
+    <div class="keypad-wrapper">
+      <div class="keypad keypad--top"    id="keypadTop"    role="group" aria-label="Scientific keys"></div>
+      <div class="keypad keypad--bottom" id="keypadBottom" role="group" aria-label="Main keys"></div>
+    </div>
 
   </div>
 

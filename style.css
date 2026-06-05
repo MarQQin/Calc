@@ -176,18 +176,35 @@ body {
   flex-shrink: 0;
 }
 
-/* ── Keypad grid ─────────────────────────────────────────── */
+/* ── Keypad wrapper ──────────────────────────────────────── */
+.keypad-wrapper {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Keypad grid (shared) ────────────────────────────────── */
 /*
- * --cols is set dynamically by JS based on the widest BUTTON_ROW.
- * Adding more columns later only requires updating the data array.
+ * --cols is set dynamically by JS based on the widest row.
  */
 .keypad {
-  flex: 1 1 0;
   display: grid;
   grid-template-columns: repeat(var(--cols, 4), 1fr);
   gap: var(--gap);
   padding: var(--gap);
-  align-content: stretch;   /* rows stretch to fill available height */
+  align-content: stretch;
+}
+
+/* Top panel — smaller buttons, gets less height */
+.keypad--top {
+  flex: 2 1 0;
+  border-bottom: 1px solid var(--clr-divider);
+}
+
+/* Bottom panel — larger buttons, gets more height */
+.keypad--bottom {
+  flex: 3 1 0;
 }
 
 /* ── Buttons ─────────────────────────────────────────────── */
@@ -200,11 +217,18 @@ body {
   font-size: clamp(20px, 5.5vw, 30px);
   font-weight: 400;
   cursor: pointer;
-  min-height: var(--btn-min-h);
   outline: none;
   color: var(--clr-text);
   touch-action: manipulation;   /* eliminates 300 ms tap delay */
   transition: filter 0.08s, transform 0.07s;
+}
+
+/* Smaller font + tighter radius for the top scientific panel */
+.keypad--top .btn {
+  font-size: clamp(11px, 3vw, 15px);
+  border-radius: 8px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .btn:active {
