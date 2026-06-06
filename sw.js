@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'calc-v1';
+const CACHE_NAME = 'calc-v2';
 const ASSETS = [
   './',
   './index.html',
