@@ -32,8 +32,6 @@
   --display-pad:    16px;
   --radius-btn:     14px;
 
-  /* Sizing — clamp keeps buttons comfortable on any screen */
-  --btn-min-h: clamp(56px, 13vw, 76px);
 }
 
 /* ── Layout shell ────────────────────────────────────────── */
@@ -51,6 +49,14 @@ body {
   flex-direction: column;
   height: 100dvh;           /* dynamic viewport — handles mobile browser chrome */
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -191,6 +197,7 @@ body {
 .keypad {
   display: grid;
   grid-template-columns: repeat(var(--cols, 4), 1fr);
+  grid-template-rows: repeat(var(--rows, 4), 1fr);
   gap: var(--gap);
   padding: var(--gap);
   align-content: stretch;
@@ -221,6 +228,7 @@ body {
   color: var(--clr-text);
   touch-action: manipulation;   /* eliminates 300 ms tap delay */
   transition: filter 0.08s, transform 0.07s;
+  height: 100%;
 }
 
 /* Smaller font + tighter radius for the top scientific panel */

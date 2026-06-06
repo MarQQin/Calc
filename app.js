@@ -391,6 +391,7 @@ function renderGrid(containerEl, rows) {
   containerEl.innerHTML = '';
   const cols = Math.max(...rows.map((row) => row.length));
   containerEl.style.setProperty('--cols', cols);
+  containerEl.style.setProperty('--rows', rows.length);
   for (const row of rows) {
     for (const btn of row) {
       const el = document.createElement('button');
