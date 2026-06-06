@@ -91,6 +91,15 @@ body {
   opacity: 0.6;
 }
 
+.display__shift-indicator {
+  display: none;
+  margin-left: 12px;
+  color: #ff9f0a;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
 /* Expression line — large, right-aligned */
 .display__expr {
   font-size: clamp(28px, 8vw, 44px);
@@ -217,6 +226,7 @@ body {
 /* ── Buttons ─────────────────────────────────────────────── */
 .btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   border: none;
@@ -229,6 +239,15 @@ body {
   touch-action: manipulation;   /* eliminates 300 ms tap delay */
   transition: filter 0.08s, transform 0.07s;
   height: 100%;
+  position: relative;
+}
+
+.btn__super {
+  font-size: 10px;
+  font-weight: 600;
+  color: #bf5af2;
+  line-height: 1;
+  margin-bottom: 1px;
 }
 
 /* Smaller font + tighter radius for the top scientific panel */

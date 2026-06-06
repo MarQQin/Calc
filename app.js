@@ -30,6 +30,7 @@ const OPERATORS = {
     if (b === 0) throw new Error('Division by zero');
     return a / b;
   }},
+  '^': { prec: 3, assoc: 'R', fn: (a, b) => Math.pow(a, b) },
 };
 
 /**
@@ -48,6 +49,24 @@ const FUNCTIONS = {
   sin: { args: 1, fn: (x) => Math.sin(state.degRad === 'deg' ? x * Math.PI / 180 : x) },
   cos: { args: 1, fn: (x) => Math.cos(state.degRad === 'deg' ? x * Math.PI / 180 : x) },
   tan: { args: 1, fn: (x) => Math.tan(state.degRad === 'deg' ? x * Math.PI / 180 : x) },
+  'sin⁻¹': { args: 1, fn: (x) => {
+    if (x < -1 || x > 1) throw new Error('sin⁻¹ domain error');
+    const r = Math.asin(x);
+    return state.degRad === 'deg' ? r * 180 / Math.PI : r;
+  }},
+  'cos⁻¹': { args: 1, fn: (x) => {
+    if (x < -1 || x > 1) throw new Error('cos⁻¹ domain error');
+    const r = Math.acos(x);
+    return state.degRad === 'deg' ? r * 180 / Math.PI : r;
+  }},
+  'tan⁻¹': { args: 1, fn: (x) => {
+    const r = Math.atan(x);
+    return state.degRad === 'deg' ? r * 180 / Math.PI : r;
+  }},
+  '√': { args: 1, fn: (x) => {
+    if (x < 0) throw new Error('√ domain error');
+    return Math.sqrt(x);
+  }},
 };
 
 /**
@@ -57,6 +76,24 @@ const FUNCTIONS = {
  *   e: String(Math.E),
  */
 const CONSTANTS = {
+};
+
+/**
+ * Engineering prefix multipliers.
+ * Single letter after a number: 10p → 10 × 10⁻¹²
+ */
+const PREFIXES = {
+  'a': 1e-18,   // atto
+  'f': 1e-15,   // femto
+  'p': 1e-12,   // pico
+  'n': 1e-9,    // nano
+  'u': 1e-6,    // micro (μ)
+  'μ': 1e-6,    // micro (μ)
+  'm': 1e-3,    // milli
+  'k': 1e3,     // kilo
+  'M': 1e6,     // mega
+  'G': 1e9,     // giga
+  'T': 1e12,    // tera
 };
 
 /** Replace constant names in the expression string. */
@@ -86,20 +123,84 @@ function tokenize(expr) {
 
     if (ch === ' ') { i++; continue; }
 
-    // Number (integer or decimal)
+    // Number (integer or decimal), with optional engineering prefix
     if (/[0-9.]/.test(ch)) {
       let num = '';
       while (i < expr.length && /[0-9.]/.test(expr[i])) num += expr[i++];
       const val = parseFloat(num);
       if (isNaN(val)) throw new Error('Invalid number: ' + num);
-      tokens.push({ type: 'number', value: val });
+      // Check for engineering prefix
+      if (i < expr.length && /[afpnumkμgt]/i.test(expr[i])) {
+        const pfx = expr[i];
+        if (pfx in PREFIXES) {
+          tokens.push({ type: 'number', value: val * PREFIXES[pfx] });
+          i++;
+        } else {
+          tokens.push({ type: 'number', value: val });
+        }
+      } else {
+        tokens.push({ type: 'number', value: val });
+      }
       continue;
     }
 
-    // Identifier — must be a known function name
+    // Square root symbol — single-char function
+    if (ch === '√') {
+      tokens.push({ type: 'function', value: '√' });
+      i++;
+      continue;
+    }
+
+    // Pi constant — insert implicit * if preceded by number or rparen
+    if (ch === 'π') {
+      const prev = tokens[tokens.length - 1];
+      if (prev && (prev.type === 'number' || prev.type === 'rparen')) {
+        tokens.push({ type: 'operator', value: '*' });
+      }
+      tokens.push({ type: 'number', value: Math.PI });
+      i++;
+      continue;
+    }
+
+    // Superscript ² — acts as ^2
+    if (ch === '²') {
+      tokens.push({ type: 'operator', value: '^' });
+      tokens.push({ type: 'number', value: 2 });
+      i++;
+      continue;
+    }
+
+    // Superscript ³ — acts as ^3
+    if (ch === '³') {
+      tokens.push({ type: 'operator', value: '^' });
+      tokens.push({ type: 'number', value: 3 });
+      i++;
+      continue;
+    }
+
+    // Superscript ⁻¹ — acts as ^(-1)
+    if (ch === '⁻') {
+      if (i + 1 < expr.length && expr[i + 1] === '¹') {
+        tokens.push({ type: 'operator', value: '^' });
+        tokens.push({ type: 'lparen' });
+        tokens.push({ type: 'number', value: 0 });
+        tokens.push({ type: 'operator', value: '-' });
+        tokens.push({ type: 'number', value: 1 });
+        tokens.push({ type: 'rparen' });
+        i += 2;
+        continue;
+      }
+    }
+
+    // Identifier — must be a known function name (may include ⁻¹ suffix)
     if (/[a-z]/i.test(ch)) {
       let name = '';
       while (i < expr.length && /[a-z]/i.test(expr[i])) name += expr[i++];
+      // Check for ⁻¹ suffix (U+207B U+00B9)
+      if (i + 1 < expr.length && expr[i] === '⁻' && expr[i + 1] === '¹') {
+        name += '⁻¹';
+        i += 2;
+      }
       if (!(name in FUNCTIONS)) throw new Error('Unknown function: ' + name);
       tokens.push({ type: 'function', value: name });
       continue;
@@ -267,6 +368,7 @@ const state = {
   history:     [],      // [{ expr, result }, ...], newest first
   historyOpen: false,
   degRad:      'deg',   // 'deg' | 'rad' — used in Phase 2 by trig functions
+  shift:       false,   // true when SHIFT mode is active
 };
 
 function loadHistory() {
@@ -307,39 +409,35 @@ function pushHistory(expr, result) {
 //           'clear' | 'backspace' | 'evaluate' | 'noop'
 // ============================================================
 
-// Top panel — 6 rows × 4 columns of smaller scientific buttons
+// Top panel — 4 rows × 6 columns of smaller scientific buttons
 const TOP_ROWS = [
   [
-    { label: 'SHIFT', action: 'noop',  type: 'mode'     },
+    { label: 'SHIFT', action: 'shift',  type: 'mode'     },
     { label: 'ALPHA', action: 'noop',  type: 'mode'     },
     { label: 'DEG',  action: 'toggleDegRad',  type: 'mode'     },
-    { label: 'ON',    action: 'clear', type: 'control'  },
+    { label: 'x⁻¹',  action: '⁻¹',  type: 'fn'       },
+    { label: 'x²',   action: '²',  type: 'fn'       },
+    { label: 'x³',   action: '³',  type: 'fn'       },
   ],
   [
-    { label: 'x²',   action: 'noop',  type: 'fn'       },
-    { label: 'x³',   action: 'noop',  type: 'fn'       },
-    { label: 'x⁻¹',  action: 'noop',  type: 'fn'       },
-    { label: '√',    action: 'noop',  type: 'fn'       },
-  ],
-  [
-    { label: 'sin',  action: 'sin(',  type: 'fn'       },
-    { label: 'cos',  action: 'cos(',  type: 'fn'       },
-    { label: 'tan',  action: 'tan(',  type: 'fn'       },
+    { label: '^',    action: '^',  type: 'operator'  },
+    { label: '√',    action: '√(',  type: 'fn'       },
+    { label: 'sin',  action: 'sin(',  type: 'fn',   shiftLabel: 'sin⁻¹', shiftAction: 'sin⁻¹(' },
+    { label: 'cos',  action: 'cos(',  type: 'fn',   shiftLabel: 'cos⁻¹', shiftAction: 'cos⁻¹(' },
+    { label: 'tan',  action: 'tan(',  type: 'fn',   shiftLabel: 'tan⁻¹', shiftAction: 'tan⁻¹(' },
     { label: 'log',  action: 'noop',  type: 'fn'       },
   ],
   [
     { label: 'ln',   action: 'noop',  type: 'fn'       },
     { label: '(',    action: '(',     type: 'paren'    },
     { label: ')',    action: ')',     type: 'paren'    },
-    { label: 'π',    action: 'noop',  type: 'constant' },
+    { label: 'π',    action: 'π',     type: 'constant' },
+    { label: '(−)',  action: 'negate', type: 'fn'       },
+    { label: 'x!',   action: 'noop',  type: 'fn'       },
   ],
   [
-    { label: 'S⇔D',  action: 'noop',  type: 'mode'     },
-    { label: 'x!',   action: 'noop',  type: 'fn'       },
     { label: 'nPr',  action: 'noop',  type: 'fn'       },
     { label: 'nCr',  action: 'noop',  type: 'fn'       },
-  ],
-  [
     { label: 'RCL',  action: 'noop',  type: 'mode'     },
     { label: 'STO',  action: 'noop',  type: 'mode'     },
     { label: 'ENG',  action: 'noop',  type: 'mode'     },
@@ -350,30 +448,30 @@ const TOP_ROWS = [
 // Bottom panel — 4 rows × 5 columns of larger main buttons
 const BOTTOM_ROWS = [
   [
-    { label: '7',   action: '7',        type: 'digit'    },
+    { label: '7',   action: '7',        type: 'digit',    superLabel: 'T', shiftAction: 'T' },
     { label: '8',   action: '8',        type: 'digit'    },
     { label: '9',   action: '9',        type: 'digit'    },
     { label: 'DEL', action: 'backspace', type: 'control'  },
     { label: 'AC',  action: 'clear',    type: 'control'  },
   ],
   [
-    { label: '4',   action: '4',        type: 'digit'    },
-    { label: '5',   action: '5',        type: 'digit'    },
-    { label: '6',   action: '6',        type: 'digit'    },
+    { label: '4',   action: '4',        type: 'digit',    superLabel: 'k', shiftAction: 'k' },
+    { label: '5',   action: '5',        type: 'digit',    superLabel: 'M', shiftAction: 'M' },
+    { label: '6',   action: '6',        type: 'digit',    superLabel: 'G', shiftAction: 'G' },
     { label: '×',   action: '*',        type: 'operator' },
     { label: '÷',   action: '/',        type: 'operator' },
   ],
   [
-    { label: '1',   action: '1',        type: 'digit'    },
-    { label: '2',   action: '2',        type: 'digit'    },
-    { label: '3',   action: '3',        type: 'digit'    },
+    { label: '1',   action: '1',        type: 'digit',    superLabel: 'n', shiftAction: 'n' },
+    { label: '2',   action: '2',        type: 'digit',    superLabel: 'μ', shiftAction: 'μ' },
+    { label: '3',   action: '3',        type: 'digit',    superLabel: 'm', shiftAction: 'm' },
     { label: '+',   action: '+',        type: 'operator' },
     { label: '−',   action: '-',        type: 'operator' },
   ],
   [
-    { label: '0',   action: '0',        type: 'digit'    },
-    { label: '.',   action: '.',        type: 'digit'    },
-    { label: 'EXP', action: 'noop',     type: 'fn'       },
+    { label: '0',   action: '0',        type: 'digit',    superLabel: 'a', shiftAction: 'a' },
+    { label: '.',   action: '.',        type: 'digit',    superLabel: 'f', shiftAction: 'f' },
+    { label: 'EXP', action: 'noop',     type: 'fn',       superLabel: 'p', shiftAction: 'p' },
     { label: 'ANS', action: 'noop',     type: 'mode'     },
     { label: '=',   action: 'evaluate', type: 'equals'   },
   ],
@@ -396,8 +494,19 @@ function renderGrid(containerEl, rows) {
     for (const btn of row) {
       const el = document.createElement('button');
       el.className   = `btn btn--${btn.type}`;
-      el.textContent = btn.label;
-      el.dataset.action = btn.action;
+      if (state.shift && (btn.shiftLabel || btn.shiftAction)) {
+        el.textContent = btn.shiftLabel || btn.label;
+        el.dataset.action = btn.shiftAction || 'noop';
+      } else {
+        el.textContent = btn.label;
+        el.dataset.action = btn.action;
+      }
+      if (btn.superLabel) {
+        const sup = document.createElement('span');
+        sup.className = 'btn__super';
+        sup.textContent = btn.superLabel;
+        el.prepend(sup);
+      }
       el.setAttribute('aria-label', btn.label);
       el.addEventListener('click', onButtonClick, { passive: true });
       containerEl.appendChild(el);
@@ -428,6 +537,9 @@ function updateDisplay() {
     resultEl.textContent = '';
     resultEl.className   = 'display__result';
   }
+
+  // SHIFT indicator
+  $('shiftIndicator').style.display = state.shift ? 'inline' : 'none';
 }
 
 /** Rebuild the history list in the panel. */
@@ -556,6 +668,18 @@ function handleAction(action) {
       computeLiveResult();
       break;
 
+    case 'negate':
+      state.expr += '-';
+      state.error = '';
+      computeLiveResult();
+      break;
+
+    case 'shift':
+      state.shift = !state.shift;
+      renderButtons();
+      updateDisplay();
+      break;
+
     case 'noop':
       break; // placeholder — no-op for unimplemented buttons
 
@@ -565,6 +689,12 @@ function handleAction(action) {
       state.error  = '';
       computeLiveResult();
       break;
+  }
+
+  // Exit shift mode after any non-shift button press
+  if (action !== 'shift' && state.shift) {
+    state.shift = false;
+    renderButtons();
   }
 
   updateDisplay();
