@@ -6,7 +6,7 @@
 // Depends on calc-engine.js loaded before this file.
 // ============================================================
 
-const { evaluate, formatResult } = window.calcEngine;
+const { evaluate, formatResult, PHYSICS_CONSTANTS } = window.calcEngine;
 
 
 // ============================================================
@@ -24,8 +24,7 @@ const state = {
   liveResult:  '',      // preview result (shown while typing)
   error:       '',      // error message after failed evaluation
   history:     [],      // [{ expr, result }, ...], newest first
-  historyOpen: false,
-  degRad:      'deg',   // 'deg' | 'rad' — used in Phase 2 by trig functions
+  historyOpen: false,  constantsOpen: false,  degRad:      'deg',   // 'deg' | 'rad' — used in Phase 2 by trig functions
   shift:       false,   // true when SHIFT mode is active
 };
 
@@ -71,7 +70,7 @@ function pushHistory(expr, result) {
 const TOP_ROWS = [
   [
     { label: 'SHIFT', action: 'shift',  type: 'mode'     },
-    { label: 'ALPHA', action: 'noop',  type: 'mode'     },
+    { label: 'ALPHA', action: 'openConstants',  type: 'mode'     },
     { label: 'DEG',  action: 'toggleDegRad',  type: 'mode'     },
     { label: 'x⁻¹',  action: '⁻¹',  type: 'fn'       },
     { label: 'x²',   action: '²',  type: 'fn'       },
@@ -248,7 +247,111 @@ function setHistoryOpen(open) {
   arrow.textContent = open ? '▴' : '▾';
   if (open) updateHistoryPanel();
 }
+/** Category definitions for grouping constants in the panel. */
+const CONSTANT_CATEGORIES = [
+  { name: 'Fundamental', keys: ['c', 'h', '\u03B1', 'G'] },
+  { name: 'Quantum',     keys: ['\u210F'] },
+  { name: 'EM',          keys: ['e', '\u03B5\u2080', '\u03BC\u2080', 'Z\u2080'] },
+  { name: 'Thermo',      keys: ['k', '\u03C3', 'N\u2090'] },
+  { name: 'Particle',    keys: ['m\u2091', 'm\u209A'] },
+];
 
+/** Pretty names for each constant symbol. */
+const CONSTANT_NAMES = {
+  'c': 'Speed of light', '\u210F': 'Reduced Planck const.', 'h': 'Planck constant',
+  'e': 'Elementary charge', 'k': 'Boltzmann constant', '\u03C3': 'Stefan-Boltzmann const.',
+  '\u03B1': 'Fine-structure const.', '\u03B5\u2080': 'Vacuum permittivity',
+  '\u03BC\u2080': 'Vacuum permeability', 'G': 'Gravitational constant',
+  'm\u2091': 'Electron mass', 'm\u209A': 'Proton mass',
+  'N\u2090': 'Avogadro constant', 'Z\u2080': 'Impedance of free space',
+};
+
+/** Build the constants panel list. */
+function renderConstantsPanel() {
+  const list = $('constantsList');
+  list.innerHTML = '';
+
+  for (const cat of CONSTANT_CATEGORIES) {
+    const header = document.createElement('div');
+    header.className = 'constants-panel__category';
+    header.textContent = cat.name;
+    list.appendChild(header);
+
+    for (const sym of cat.keys) {
+      const val = PHYSICS_CONSTANTS[sym];
+      if (val === undefined) continue;
+
+      const row = document.createElement('div');
+      row.className = 'constants-panel__row';
+
+      const info = document.createElement('div');
+      info.className = 'constants-panel__info';
+
+      const symEl = document.createElement('span');
+      symEl.className = 'constants-panel__symbol';
+      symEl.textContent = sym;
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'constants-panel__name';
+      nameEl.textContent = CONSTANT_NAMES[sym] || sym;
+
+      info.appendChild(symEl);
+      info.appendChild(nameEl);
+
+      const actions = document.createElement('div');
+      actions.className = 'constants-panel__actions';
+
+      const symBtn = document.createElement('button');
+      symBtn.className = 'constants-panel__btn constants-panel__btn--sym';
+      symBtn.textContent = 'sym';
+      symBtn.addEventListener('click', () => {
+        insertConstantSymbol(sym);
+      }, { passive: true });
+
+      const valBtn = document.createElement('button');
+      valBtn.className = 'constants-panel__btn constants-panel__btn--val';
+      valBtn.textContent = '123';
+      valBtn.addEventListener('click', () => {
+        insertConstantValue(val);
+      }, { passive: true });
+
+      actions.appendChild(symBtn);
+      actions.appendChild(valBtn);
+
+      row.appendChild(info);
+      row.appendChild(actions);
+      list.appendChild(row);
+    }
+  }
+}
+
+function insertConstantSymbol(sym) {
+  state.expr  += sym;
+  state.error  = '';
+  computeLiveResult();
+  updateDisplay();
+  setConstantsOpen(false);
+}
+
+function insertConstantValue(val) {
+  // Format the value compactly
+  const formatted = parseFloat(val.toPrecision(10)).toString();
+  state.expr  += formatted;
+  state.error  = '';
+  computeLiveResult();
+  updateDisplay();
+  setConstantsOpen(false);
+}
+
+function setConstantsOpen(open) {
+  state.constantsOpen = open;
+  $('constantsPanel').classList.toggle('open', open);
+  if (open) {
+    renderConstantsPanel();
+    // Close history if open
+    if (state.historyOpen) setHistoryOpen(false);
+  }
+}
 /**
  * Attempt a silent live evaluation preview.
  * Errors are suppressed — the user is likely mid-expression.
@@ -294,7 +397,19 @@ function handleAction(action) {
 
     case 'backspace':
       if (state.expr.length > 0) {
-        state.expr = state.expr.slice(0, -1);
+        // Check if expression ends with a multi-char physics constant symbol
+        const syms = Object.keys(PHYSICS_CONSTANTS).sort((a, b) => b.length - a.length);
+        let removed = false;
+        for (const sym of syms) {
+          if (sym.length > 1 && state.expr.endsWith(sym)) {
+            state.expr = state.expr.slice(0, -sym.length);
+            removed = true;
+            break;
+          }
+        }
+        if (!removed) {
+          state.expr = state.expr.slice(0, -1);
+        }
         state.error = '';
         computeLiveResult();
       }
@@ -337,7 +452,9 @@ function handleAction(action) {
       renderButtons();
       updateDisplay();
       break;
-
+    case 'openConstants':
+      setConstantsOpen(!state.constantsOpen);
+      break;
     case 'noop':
       break; // placeholder — no-op for unimplemented buttons
 
@@ -387,6 +504,10 @@ function init() {
 
   $('historyToggle').addEventListener('click', () => {
     setHistoryOpen(!state.historyOpen);
+  }, { passive: true });
+
+  $('constantsClose').addEventListener('click', () => {
+    setConstantsOpen(false);
   }, { passive: true });
 
   document.addEventListener('keydown', onKeyDown);

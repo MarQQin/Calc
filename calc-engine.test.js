@@ -96,6 +96,44 @@ describe('evaluate — π constant', () => {
 
 // ── Error cases ──────────────────────────────────────────────
 
+// ── Physics constants ─────────────────────────────────────
+
+const PHYSICS_CONSTANTS = require('./calc-engine.js').PHYSICS_CONSTANTS;
+
+describe('evaluate — physics constants', () => {
+  it('c = speed of light',         () => assert.equal(evaluate('c'), 299792458));
+  it('h = Planck constant',        () => assert.ok(Math.abs(evaluate('h') - 6.62607015e-34) < 1e-43));
+  it('e = elementary charge',      () => assert.ok(Math.abs(evaluate('e') - 1.602176634e-19) < 1e-29));
+  it('k = Boltzmann constant',     () => assert.ok(Math.abs(evaluate('k') - 1.380649e-23) < 1e-33));
+  it('ℏ = reduced Planck const',   () => assert.ok(Math.abs(evaluate('\u210F') - 1.054571817e-34) < 1e-44));
+  it('α = fine-structure const',   () => assert.ok(Math.abs(evaluate('\u03B1') - 7.2973525693e-3) < 1e-13));
+  it('σ = Stefan-Boltzmann',       () => assert.ok(Math.abs(evaluate('\u03C3') - 5.670374419e-8) < 1e-18));
+  it('ε₀ = vacuum permittivity',   () => assert.ok(Math.abs(evaluate('\u03B5\u2080') - 8.8541878128e-12) < 1e-22));
+  it('μ₀ = vacuum permeability',   () => assert.ok(Math.abs(evaluate('\u03BC\u2080') - 1.25663706212e-6) < 1e-16));
+  it('mₑ = electron mass',         () => assert.ok(Math.abs(evaluate('m\u2091') - 9.1093837015e-31) < 1e-41));
+  it('mₚ = proton mass',           () => assert.ok(Math.abs(evaluate('m\u209A') - 1.67262192369e-27) < 1e-37));
+  it('Nₐ = Avogadro constant',     () => assert.ok(Math.abs(evaluate('N\u2090') - 6.02214076e23) < 1e13));
+  it('Z₀ = impedance free space',  () => assert.ok(Math.abs(evaluate('Z\u2080') - 376.730313668) < 1e-6));
+  it('G = gravitational const',    () => assert.ok(Math.abs(evaluate('G') - 6.67430e-11) < 1e-15));
+});
+
+describe('evaluate — physics constants: implicit multiplication', () => {
+  it('2π still works',             () => assert.ok(Math.abs(evaluate('2π') - 2 * Math.PI) < 1e-10));
+  it('2c = 2×speed of light',      () => assert.equal(evaluate('2c'), 599584916));
+  it('5k after number = prefix',   () => assert.equal(evaluate('5k'), 5000));  // kilo prefix wins
+  it('standalone k = Boltzmann',   () => assert.ok(Math.abs(evaluate('k') - 1.380649e-23) < 1e-33));
+  it('5G after number = prefix',   () => assert.equal(evaluate('5G'), 5e9));  // giga prefix wins
+  it('standalone G = gravitational', () => assert.ok(Math.abs(evaluate('G') - 6.67430e-11) < 1e-15));
+  it('c*c = c²',                   () => assert.ok(Math.abs(evaluate('c*c') - 299792458 ** 2) < 1e15));
+  it('2*c+3',                      () => assert.equal(evaluate('2*c+3'), 599584919));
+});
+
+describe('evaluate — physics constants: functions still work', () => {
+  it('sin(90) unchanged',          () => assert.ok(Math.abs(evaluate('sin(90)', 'deg') - 1) < 1e-10));
+  it('cos(0) unchanged',           () => assert.ok(Math.abs(evaluate('cos(0)', 'deg') - 1) < 1e-10));
+  it('√(c) works',                 () => assert.ok(Math.abs(evaluate('√(c)') - Math.sqrt(299792458)) < 1));
+});
+
 describe('evaluate — errors', () => {
   it('division by zero throws',       () => assert.throws(() => evaluate('1/0'), /Division by zero/));
   it('empty expression throws',       () => assert.throws(() => evaluate(''), /Empty/));

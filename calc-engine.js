@@ -65,6 +65,37 @@ const CONSTANTS = {
 };
 
 /**
+ * Physics constants — tokenized by symbol in the expression.
+ * Values are SI (CODATA 2018).
+ */
+const PHYSICS_CONSTANTS = {
+  'c':  299792458,           // speed of light (m/s)
+  '\u210F': 1.054571817e-34, // reduced Planck constant (J·s)
+  'h':  6.62607015e-34,      // Planck constant (J·s)
+  'e':  1.602176634e-19,     // elementary charge (C)
+  'k':  1.380649e-23,        // Boltzmann constant (J/K)
+  '\u03C3': 5.670374419e-8,  // Stefan-Boltzmann constant (W/m\u00B2K\u2074)
+  '\u03B1': 7.2973525693e-3, // fine-structure constant
+  '\u03B5\u2080': 8.8541878128e-12,  // vacuum permittivity (F/m)
+  '\u03BC\u2080': 1.25663706212e-6,  // vacuum permeability (H/m)
+  'G':  6.67430e-11,         // gravitational constant (m\u00B3/kg\u00B7s\u00B2)
+  'm\u2091': 9.1093837015e-31,    // electron mass (kg)
+  'm\u209A': 1.67262192369e-27,   // proton mass (kg)
+  'N\u2090': 6.02214076e23,       // Avogadro constant (1/mol)
+  'Z\u2080': 376.730313668,       // impedance of free space (\u03A9)
+};
+
+/** Constant symbols sorted longest-first for greedy matching. */
+const PHYSICS_SYMBOLS = Object.keys(PHYSICS_CONSTANTS)
+  .sort((a, b) => b.length - a.length);
+
+/** Symbols that start with or contain non-ASCII chars (safe before identifier). */
+const PHYSICS_SYMBOLS_NONASCII = PHYSICS_SYMBOLS.filter(s => !/^[a-z]+$/i.test(s));
+
+/** Single-letter Latin constant symbols (must fall through to identifier section). */
+const PHYSICS_SYMBOLS_LATIN = PHYSICS_SYMBOLS.filter(s => /^[a-z]$/i.test(s));
+
+/**
  * Engineering prefix multipliers.
  * Single letter after a number: 10p → 10 × 10⁻¹²
  */
@@ -147,7 +178,23 @@ function tokenize(expr) {
       i++;
       continue;
     }
-
+    // Non-ASCII physics constants — longest match first, implicit * when needed
+    {
+      let matched = false;
+      for (const sym of PHYSICS_SYMBOLS_NONASCII) {
+        if (expr.startsWith(sym, i)) {
+          const prev = tokens[tokens.length - 1];
+          if (prev && (prev.type === 'number' || prev.type === 'rparen')) {
+            tokens.push({ type: 'operator', value: '*' });
+          }
+          tokens.push({ type: 'number', value: PHYSICS_CONSTANTS[sym] });
+          i += sym.length;
+          matched = true;
+          break;
+        }
+      }
+      if (matched) continue;
+    }
     // Superscript ² — acts as ^2
     if (ch === '²') {
       tokens.push({ type: 'operator', value: '^' });
@@ -179,6 +226,7 @@ function tokenize(expr) {
     }
 
     // Identifier — must be a known function name (may include ⁻¹ suffix)
+    // or a Latin-letter physics constant
     if (/[a-z]/i.test(ch)) {
       let name = '';
       while (i < expr.length && /[a-z]/i.test(expr[i])) name += expr[i++];
@@ -187,8 +235,17 @@ function tokenize(expr) {
         name += '⁻¹';
         i += 2;
       }
-      if (!(name in _FUNCTIONS)) throw new Error('Unknown function: ' + name);
-      tokens.push({ type: 'function', value: name });
+      if (name in _FUNCTIONS) {
+        tokens.push({ type: 'function', value: name });
+      } else if (name in PHYSICS_CONSTANTS) {
+        const prev = tokens[tokens.length - 1];
+        if (prev && (prev.type === 'number' || prev.type === 'rparen')) {
+          tokens.push({ type: 'operator', value: '*' });
+        }
+        tokens.push({ type: 'number', value: PHYSICS_CONSTANTS[name] });
+      } else {
+        throw new Error('Unknown function: ' + name);
+      }
       continue;
     }
 
@@ -372,10 +429,10 @@ function formatResult(n) {
 
 // Export for both environments
 if (typeof window !== 'undefined') {
-  window.calcEngine = { evaluate, formatResult };
+  window.calcEngine = { evaluate, formatResult, PHYSICS_CONSTANTS };
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { evaluate, formatResult };
+  module.exports = { evaluate, formatResult, PHYSICS_CONSTANTS };
 }
 
 })();
