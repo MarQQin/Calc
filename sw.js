@@ -1,10 +1,11 @@
 'use strict';
 
-const CACHE_NAME = 'calc-v2';
+const CACHE_NAME = 'calc-v3';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
+  './calc-engine.js',
   './app.js',
   './manifest.json',
   './icons/icon.svg',
