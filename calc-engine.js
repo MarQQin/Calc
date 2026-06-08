@@ -420,10 +420,28 @@ function evaluate(exprStr, degRad) {
 /**
  * Format a result number for display.
  * Uses toPrecision(12) to suppress floating-point noise like 0.1+0.2 = 0.30000000000004.
+ * Shows exponential notation for |n| >= 1e10 or (0 < |n| < 1e-6).
+ * In 'eng' mode, exponents are rounded to multiples of 3.
+ *
+ * @param {number} n
+ * @param {string} [mode='sci'] - 'sci' or 'eng'
+ * @param {number} [engShift=0] - extra ×3 shifts in eng mode
  */
-function formatResult(n) {
+function formatResult(n, mode, engShift) {
   if (isNaN(n))     return 'Error';
   if (!isFinite(n)) return n > 0 ? '∞' : '-∞';
+  const abs = Math.abs(n);
+  const useExponential = abs !== 0 && (abs >= 1e10 || abs < 1e-6);
+  if (useExponential && mode === 'eng') {
+    // Engineering notation: exponent rounded to multiple of 3
+    const exp = Math.floor(Math.log10(abs));
+    const engExp = 3 * Math.floor(exp / 3) + (engShift || 0);
+    const mantissa = n / Math.pow(10, engExp);
+    return parseFloat(mantissa.toPrecision(10)) + 'e' + engExp;
+  }
+  if (useExponential) {
+    return parseFloat(n.toPrecision(10)).toExponential();
+  }
   return parseFloat(n.toPrecision(12)).toString();
 }
 

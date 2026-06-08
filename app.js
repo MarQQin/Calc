@@ -24,7 +24,10 @@ const state = {
   liveResult:  '',      // preview result (shown while typing)
   error:       '',      // error message after failed evaluation
   history:     [],      // [{ expr, result }, ...], newest first
-  historyOpen: false,  constantsOpen: false,  degRad:      'deg',   // 'deg' | 'rad' — used in Phase 2 by trig functions
+  historyOpen: false, constantsOpen: false,
+  displayMode: 'sci', // 'sci' | 'eng' — scientific or engineering notation
+  engShift: 0,        // extra ×3 shifts applied in eng mode (for ▶ENG/◀ENG buttons)
+  degRad:      'deg',   // 'deg' | 'rad' — used in Phase 2 by trig functions
   shift:       false,   // true when SHIFT mode is active
 };
 
@@ -66,39 +69,79 @@ function pushHistory(expr, result) {
 //           'clear' | 'backspace' | 'evaluate' | 'noop'
 // ============================================================
 
-// Top panel — 4 rows × 6 columns of smaller scientific buttons
+// Top panel — 5 rows × 6 columns with shift-label rows between
 const TOP_ROWS = [
   [
     { label: 'SHIFT', action: 'shift',  type: 'mode'     },
-    { label: 'ALPHA', action: 'openConstants',  type: 'mode'     },
+    { label: 'CONST', action: 'openConstants',  type: 'mode'     },
     { label: 'DEG',  action: 'toggleDegRad',  type: 'mode'     },
-    { label: 'x⁻¹',  action: '⁻¹',  type: 'fn'       },
-    { label: 'x²',   action: '²',  type: 'fn'       },
-    { label: 'x³',   action: '³',  type: 'fn'       },
+    { label: 'no1',  action: 'noop',  type: 'fn'       },
+    { label: '⌫',    action: 'backspace', type: 'control' },
+    { label: 'AC',   action: 'clear',     type: 'control' },
   ],
   [
-    { label: '^',    action: '^',  type: 'operator'  },
-    { label: '√',    action: '√(',  type: 'fn'       },
+    { label: 'no2', type: 'shift-label' },
+    { label: 'no3', type: 'shift-label' },
+    { label: 'sin⁻¹', type: 'shift-label' },
+    { label: 'cos⁻¹', type: 'shift-label' },
+    { label: 'tan⁻¹', type: 'shift-label' },
+    { label: 'no4', type: 'shift-label' },
+  ],
+  [
+    { label: 'no5',  action: 'noop',  type: 'fn'       },
+    { label: 'no6',  action: 'noop',  type: 'fn'       },
     { label: 'sin',  action: 'sin(',  type: 'fn',   shiftLabel: 'sin⁻¹', shiftAction: 'sin⁻¹(' },
     { label: 'cos',  action: 'cos(',  type: 'fn',   shiftLabel: 'cos⁻¹', shiftAction: 'cos⁻¹(' },
     { label: 'tan',  action: 'tan(',  type: 'fn',   shiftLabel: 'tan⁻¹', shiftAction: 'tan⁻¹(' },
-    { label: 'log',  action: 'noop',  type: 'fn'       },
+    { label: 'no7',  action: 'noop',  type: 'fn'       },
   ],
   [
-    { label: 'ln',   action: 'noop',  type: 'fn'       },
-    { label: '(',    action: '(',     type: 'paren'    },
-    { label: ')',    action: ')',     type: 'paren'    },
+    { label: 'hyp', type: 'shift-label' },
+    { label: 'no8', type: 'shift-label' },
+    { label: 'no9', type: 'shift-label' },
+    { label: 'no10', type: 'shift-label' },
+    { label: '∠', type: 'shift-label' },
+    { label: 'logₓy', type: 'shift-label' },
+  ],
+  [
+    { label: 'no11',  action: 'noop',  type: 'fn'       },
+    { label: 'no12',  action: 'noop',  type: 'fn'       },
+    { label: 'no13',  action: 'noop',  type: 'fn'       },
     { label: 'π',    action: 'π',     type: 'constant' },
-    { label: '(−)',  action: 'negate', type: 'fn'       },
-    { label: 'x!',   action: 'noop',  type: 'fn'       },
+    { label: 'no14',  action: 'noop',  type: 'fn'       },
+    { label: 'no15',  action: 'noop',  type: 'fn'       },
   ],
   [
-    { label: 'nPr',  action: 'noop',  type: 'fn'       },
-    { label: 'nCr',  action: 'noop',  type: 'fn'       },
-    { label: 'RCL',  action: 'noop',  type: 'mode'     },
-    { label: 'STO',  action: 'noop',  type: 'mode'     },
-    { label: 'ENG',  action: 'noop',  type: 'mode'     },
-    { label: '°\'"', action: 'noop',  type: 'fn'       },
+    { label: 'lim', type: 'shift-label' },
+    { label: 'x³', type: 'shift-label' },
+    { label: '³√x', type: 'shift-label' },
+    { label: 'ˣ√y', type: 'shift-label' },
+    { label: '10ˣ', type: 'shift-label' },
+    { label: 'e', type: 'shift-label' },
+  ],
+  [
+    { label: 'x⁻¹',  action: '⁻¹',  type: 'fn'       },
+    { label: 'x²',   action: '²',  type: 'fn'       },
+    { label: '√',    action: '√(',  type: 'fn'       },
+    { label: 'xʸ',   action: '^',  type: 'operator'  },
+    { label: 'log₁₀', action: 'noop', type: 'fn'     },
+    { label: 'ln',   action: 'noop',  type: 'fn'       },
+  ],
+  [
+    { label: 'S/E', action: 'toggleDisplayMode', type: 'fn' },
+    { label: 'a/ᶜ', type: 'shift-label' },
+    { label: 'Y', type: 'shift-label' },
+    { label: 'HISTORY', type: 'shift-label' },
+    { label: 'M+', type: 'shift-label' },
+    { label: 'M-', type: 'shift-label' },
+  ],
+  [
+    { label: '◀ENG', action: 'engLeft', type: 'fn'   },
+    { label: 'ENG▶', action: 'engRight', type: 'fn'   },
+    { label: 'no18', action: 'noop', type: 'fn'   },
+    { label: 'no19', action: 'noop', type: 'fn'   },
+    { label: 'no20', action: 'noop', type: 'fn'   },
+    { label: 'no21', action: 'noop', type: 'fn'   },
   ],
 ];
 
@@ -108,8 +151,8 @@ const BOTTOM_ROWS = [
     { label: '7',   action: '7',        type: 'digit',    superLabel: 'T', shiftAction: 'T' },
     { label: '8',   action: '8',        type: 'digit'    },
     { label: '9',   action: '9',        type: 'digit'    },
-    { label: 'DEL', action: 'backspace', type: 'control'  },
-    { label: 'AC',  action: 'clear',    type: 'control'  },
+    { label: '(',   action: '(',        type: 'paren'    },
+    { label: ')',   action: ')',        type: 'paren'    },
   ],
   [
     { label: '4',   action: '4',        type: 'digit',    superLabel: 'k', shiftAction: 'k' },
@@ -149,13 +192,24 @@ function renderGrid(containerEl, rows) {
   containerEl.style.setProperty('--rows', rows.length);
   for (const row of rows) {
     for (const btn of row) {
-      const el = document.createElement('button');
-      el.className   = `btn btn--${btn.type}`;
-      if (state.shift && (btn.shiftLabel || btn.shiftAction)) {
-        el.textContent = btn.shiftLabel || btn.label;
-        el.dataset.action = btn.shiftAction || 'noop';
-      } else {
+      // Shift-label rows are plain text, not buttons
+      if (btn.type === 'shift-label') {
+        const el = document.createElement('div');
+        el.className = 'shift-label' + (btn.action ? ' shift-label--action' : '');
         el.textContent = btn.label;
+        if (btn.action) {
+          el.dataset.action = btn.action;
+          el.addEventListener('click', onButtonClick, { passive: true });
+        }
+        containerEl.appendChild(el);
+        continue;
+      }
+      const el = document.createElement('button');
+      el.className   = `btn btn--${btn.type}${btn.action === 'shift' ? ' btn--shift' : ''}`;
+      el.textContent = btn.label;
+      if (state.shift && btn.shiftAction) {
+        el.dataset.action = btn.shiftAction;
+      } else {
         el.dataset.action = btn.action;
       }
       if (btn.superLabel) {
@@ -371,7 +425,7 @@ function computeLiveResult() {
   try {
     const closed    = autoCloseParens(expr);
     const result    = evaluate(closed, state.degRad);
-    const formatted = formatResult(result);
+    const formatted = formatResult(result, state.displayMode, state.engShift);
     // Don't echo the same value (happens right after '=' is pressed)
     if (formatted !== state.expr) {
       state.liveResult = formatted;
@@ -393,6 +447,7 @@ function handleAction(action) {
       state.expr        = '';
       state.liveResult  = '';
       state.error       = '';
+      state.engShift    = 0;
       break;
 
     case 'backspace':
@@ -420,7 +475,7 @@ function handleAction(action) {
       try {
         const closed    = autoCloseParens(state.expr);
         const result    = evaluate(closed, state.degRad);
-        const formatted = formatResult(result);
+        const formatted = formatResult(result, state.displayMode, state.engShift);
         pushHistory(state.expr, formatted);
         if (state.historyOpen) updateHistoryPanel();
         state.expr       = formatted;
@@ -439,6 +494,31 @@ function handleAction(action) {
       const modeBtn = document.querySelector('[data-action="toggleDegRad"]');
       if (modeBtn) modeBtn.textContent = state.degRad.toUpperCase();
       computeLiveResult();
+      break;
+
+    case 'toggleDisplayMode':
+      state.displayMode = state.displayMode === 'sci' ? 'eng' : 'sci';
+      state.engShift = 0;
+      // Update the S/E label
+      const seBtn = document.querySelector('[data-action="toggleDisplayMode"]');
+      if (seBtn) seBtn.textContent = state.displayMode === 'sci' ? 'SCI' : 'ENG';
+      computeLiveResult();
+      break;
+
+    case 'engLeft':
+      if (state.displayMode === 'eng') {
+        state.engShift -= 3;
+        computeLiveResult();
+        updateDisplay();
+      }
+      break;
+
+    case 'engRight':
+      if (state.displayMode === 'eng') {
+        state.engShift += 3;
+        computeLiveResult();
+        updateDisplay();
+      }
       break;
 
     case 'negate':

@@ -1,0 +1,5 @@
+lets implement engineering mode display, alternatively with n u m k M G 
+make the two left nop buttons in the 5th button row <ENG and ENG>. replace the < > with triangular arrows.
+make those two buttons shifted E/S (engineering/scientific) and umk (u being a greek mu)
+the E/S switches between regular and engineering mode, where the exponent is rounded in multiples of 3
+
